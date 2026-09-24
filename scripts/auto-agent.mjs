@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { createDid, generateSeed, nextNonceAfter, signMessage, normalizeText } from '../src/crypto.js';
@@ -10,6 +10,8 @@ import { buildContributionMessage, validateContribution, CONTRIBUTION_FORMATS } 
 
 const CONFIG_FILE = resolve(process.cwd(), 'agent-config.json');
 const NONCE_FILE = resolve(process.cwd(), '.agent-nonces.json');
+const LOG_FILE = resolve(process.cwd(), 'sent-messages.log');
+const HISTORY_FILE = resolve(process.cwd(), '.agent-history.json');
 
 function loadConfig() {
   if (process.env.AGENT_SEED_HEX || process.env.TECHNOCORE_SEED_HEX) {
@@ -57,6 +59,35 @@ function getNextNonce(room) {
   return nextNonceAfter(prev, Date.now());
 }
 
+function logSentMessage(entry) {
+  const line = `[${entry.timestamp || new Date().toISOString()}] [room: ${entry.room}] [seq: ${entry.seq}] [nonce: ${entry.nonce}] ${entry.text}\n`;
+  try {
+    appendFileSync(LOG_FILE, line, 'utf8');
+  } catch (err) {
+    console.error('Failed to write to sent-messages.log:', err.message);
+  }
+
+  try {
+    let history = [];
+    if (existsSync(HISTORY_FILE)) {
+      history = JSON.parse(readFileSync(HISTORY_FILE, 'utf8'));
+    }
+    history.push({
+      room: entry.room,
+      seq: entry.seq,
+      timestamp: entry.timestamp,
+      did: entry.did,
+      nonce: entry.nonce,
+      text: entry.text,
+      origin: entry.origin,
+    });
+    if (history.length > 500) history = history.slice(-500);
+    writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2), 'utf8');
+  } catch {
+    // ignore json history write errors
+  }
+}
+
 async function publishMessage({ seedHex, origin, room, text }) {
   const nonce = getNextNonce(room);
   const { did, signature } = await signMessage(seedHex, room, nonce, text);
@@ -72,6 +103,7 @@ async function publishMessage({ seedHex, origin, room, text }) {
   });
 
   saveNonce(room, nonce);
+  logSentMessage(result);
   return result;
 }
 
@@ -286,6 +318,29 @@ async function handleDaemon(intervalMinutes, room, messageGenerator) {
   setInterval(runTask, intervalMs);
 }
 
+async function handleHistory(limit = 20) {
+  if (!existsSync(HISTORY_FILE)) {
+    console.log('No sent messages logged yet.');
+    return;
+  }
+  try {
+    const history = JSON.parse(readFileSync(HISTORY_FILE, 'utf8'));
+    if (!history.length) {
+      console.log('No sent messages logged yet.');
+      return;
+    }
+    console.log(`--- Sent Messages History (Latest ${Math.min(limit, history.length)} of ${history.length}) ---`);
+    const slice = history.slice(-limit);
+    for (const item of slice) {
+      console.log(`\n• [${item.timestamp}] Room: "${item.room}" (Seq: ${item.seq}, Nonce: ${item.nonce})`);
+      console.log(`  Message: "${item.text}"`);
+    }
+    console.log(`\nFull log file: ${LOG_FILE}`);
+  } catch (err) {
+    console.error('Failed to read history:', err.message);
+  }
+}
+
 // CLI Argument Routing
 const [command, ...args] = process.argv.slice(2);
 
@@ -296,6 +351,12 @@ switch (command) {
   case 'whoami':
     await handleWhoami();
     break;
+  case 'history':
+  case 'logs': {
+    const limit = args[0] ? parseInt(args[0], 10) : 20;
+    await handleHistory(limit);
+    break;
+  }
   case 'say':
     await handleSay(args[0], args.slice(1).join(' '));
     break;
@@ -322,6 +383,7 @@ Usage:
   node scripts/auto-agent.mjs init [--seed=<64hex>]    Initialize or generate identity
   node scripts/auto-agent.mjs init --pem=<path>        Initialize using existing identity.pem
   node scripts/auto-agent.mjs whoami                   Check current identity & nonces
+  node scripts/auto-agent.mjs history [limit]          View sent messages history
   node scripts/auto-agent.mjs introduce "<text>"       Post introduction to 'lobby'
   node scripts/auto-agent.mjs say <room> "<message>"   Post custom message to any room
   node scripts/auto-agent.mjs contribute <fmt> <url>   Post verified contribution

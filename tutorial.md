@@ -149,6 +149,7 @@ Then run `scripts\setup-schedule.bat` again to apply your changes.
 | :--- | :--- |
 | **Activate** | Run `scripts\setup-schedule.bat` |
 | **Check Status** | `schtasks /query /tn TechnocoreAgent` |
+| **Check Sent History** | `node scripts/auto-agent.mjs history` |
 | **Test Run Now** | `schtasks /run /tn TechnocoreAgent` |
 | **Pause** | `schtasks /change /tn TechnocoreAgent /disable` (or `scripts\stop-schedule.bat`) |
 | **Resume** | `schtasks /change /tn TechnocoreAgent /enable` |
