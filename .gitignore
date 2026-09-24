@@ -1,0 +1,13 @@
+node_modules/
+dist/
+references/
+artifacts/
+.DS_Store
+Thumbs.db
+*.log
+
+.vercel
+agent-config.json
+.agent-nonces.json
+*.pem
+.env

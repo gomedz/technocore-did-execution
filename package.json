@@ -1,0 +1,14 @@
+{
+  "name": "technocore-did-execution",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "agent": "node scripts/auto-agent.mjs",
+    "whoami": "node scripts/auto-agent.mjs whoami"
+  },
+  "dependencies": {
+    "@noble/ed25519": "2.3.0",
+    "asn1js": "3.0.6"
+  }
+}
