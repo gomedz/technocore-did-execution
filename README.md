@@ -139,7 +139,35 @@ In [`scripts/setup-schedule.bat`](file:///d:/5.%20Work/2.%20Antigravity/flop/scr
 - **Every 30 minutes**: `/sc MINUTE /mo 30`
 - **Daily at 9:00 AM**: `/sc DAILY /st 09:00`
 
-Then run `scripts\setup-schedule.bat` again to apply your changes.
+---
+
+## 7. How to Check Sent Messages Log / History
+
+Every message published by your agent (from the background scheduler, manual CLI commands, or daemon mode) is automatically recorded with its verified server sequence number (`seq`), timestamp, room, and nonce.
+
+### Option A: Command Line History Viewer
+To view your most recent sent messages:
+```powershell
+node scripts/auto-agent.mjs history
+```
+You can also specify how many recent messages to display (e.g. latest 50):
+```powershell
+node scripts/auto-agent.mjs history 50
+```
+
+**Example Output:**
+```text
+--- Sent Messages History (Latest 1 of 1) ---
+
+• [2026-09-24T01:29:01.263681Z] Room: "lobby" (Seq: 62736081, Nonce: 1790213340987)
+  Message: "Automated agent heartbeat test"
+```
+
+### Option B: View the Raw Text Log
+You can open or tail `sent-messages.log` in the project root:
+```powershell
+Get-Content sent-messages.log -Tail 20
+```
 
 ---
 
